@@ -1,0 +1,89 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+np.random.seed(42)
+n = 5000
+dates = pd.date_range(start='2024-01-01', periods=365, freq='D')
+orders = pd.DataFrame({
+    'order_id': np.arange(n),
+    'order_date': np.random.choice(dates, size=n),
+    'customer_id': np.random.randint(1000, 1500, size=n),
+    'region': np.random.choice(['North', 'South', 'East', 'West'], size=n),
+    'product_id': np.random.randint(1, 20, size=n),
+    'price': np.random.uniform(10, 200, size=n).round(2),
+    'quantity': np.random.randint(1, 5, size=n)
+})
+orders['revenue'] = orders['price'] * orders['quantity']
+
+# 2. SQL-like queries using pandas
+orders['month'] = orders['order_date'].dt.to_period('M')
+monthly_rev = (
+    orders.groupby('month')['revenue']
+    .sum()
+    .reset_index()
+)
+
+top_products = (
+    orders.groupby('product_id')['revenue']
+    .sum()
+    .nlargest(5)
+    .reset_index()
+)
+
+cust_freq = (
+    orders.groupby('customer_id')
+    .agg(
+        total_orders=('order_id', 'count'),
+        total_spend=('revenue', 'sum')
+    )
+    .reset_index()
+)
+
+cust_freq['segment'] = pd.qcut(
+    cust_freq['total_spend'],
+    q=4,
+    labels=['Low', 'Medium', 'High', 'Very High']
+)
+
+# 3. Visualizations
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+
+axes[0, 0].plot(monthly_rev['month'].astype(str), monthly_rev['revenue'], marker='o')
+axes[0, 0].set_title('Monthly Revenue Trend')
+axes[0, 0].set_xticks(range(len(monthly_rev)))
+axes[0, 0].set_xticklabels(monthly_rev['month'].astype(str), rotation=45)
+
+axes[0, 1].bar(top_products['product_id'].astype(str), top_products['revenue'], color='orange')
+axes[0, 1].set_title('Top 5 Products by Revenue')
+axes[0, 1].set_xlabel('Product ID')
+
+axes[1, 0].scatter(cust_freq['total_orders'], cust_freq['total_spend'], alpha=0.6)
+axes[1, 0].set_title('Customer Order Frequency vs. Spend')
+axes[1, 0].set_xlabel('Number of Orders')
+axes[1, 0].set_ylabel('Total Spend')
+
+segments = cust_freq['segment'].value_counts().sort_index()
+axes[1, 1].pie(
+    segments,
+    labels=segments.index,
+    autopct='%1.1f%%',
+    startangle=90
+)
+axes[1, 1].set_title('Customer Spend Segments')
+
+plt.tight_layout()
+plt.show() 
+
+# 4. Console Output
+print("\n Monthly Revenue:\n")
+print(monthly_rev.to_string(index=False))
+
+print("\nTop 5 Products by Revenue:\n")
+print(top_products.to_string(index=False))
+
+print("\n Sample Customer Spend Segments:\n")
+print(cust_freq[['customer_id', 'total_spend', 'segment']].head(10).to_string(index=False))
+
+print("\nChart displayed successfully.\n")
